@@ -9,21 +9,23 @@ import tempfile
 import re
 import os
 import random
+import pickle
 
+
+with open('label_encoder.pkl', 'rb') as file:
+    loaded_encoder = pickle.load(file)
+print("Encoder loaded successfully!")
 # Load the trained model
 model = load_model(r'C:\LUMINAR\PROJECT\SmartGrocery\my_model2.keras')  # Replace with your model's path
+
 # Update this path if necessary
-path = r'C:\LUMINAR\PROJECT\SmartGrocery\validation'
+path = r'C:\LUMINAR\PROJECT\SmartGrocery\archive (5)\validation'
 categories = os.listdir(path)
 # Generate a dictionary with random prices for each item
 item_prices = {category: random.randint(5, 30) for category in categories}
 
 # Function to preprocess images for model prediction
-def preprocess_image(image):
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = cv2.resize(image, (150, 150))
-    image = np.array(image) / 255.0
-    return np.expand_dims(image, axis=0)
+
 
 def preprocess_image(img):
       
@@ -99,20 +101,23 @@ with left_col:
     if capture_image:
         video = cv2.VideoCapture(0)
         time = 0
-        while time <= 40:
-            
-            ret, frame = video.read()
-            if ret:
-                # cv2.imshow('image', frame)
-                processed_image = preprocess_image(frame)
-                prediction = model.predict(processed_image)
+        st.text("Capturing...")
+        while time <= 40:            
+            success, image = video.read()
+            if success:
+                img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                img_resise = cv2.resize(img_rgb, (150, 150))                
+                img_reshape = img_resise.reshape(1, 150, 150, 3) / 255.0    
+                prediction = model.predict(img_reshape)
                 confidence = np.max(prediction)
                 time+=1            
-                if confidence>0.6:
+                if confidence>0.75:
                     video.release()
-                    st.image(frame, channels="BGR", caption="Captured Image")
-                    predicted_item = categories[prediction.argmax()]
-                    print(predicted_item)
+                    st.image(image, channels="BGR", caption="Captured Image")
+                    p = prediction.argmax().item()
+                    predicted_item = loaded_encoder.inverse_transform([p]).item()
+                    # predicted_item = categories[prediction.argmax().item()]
+                    print(predicted_item, prediction.argmax().item())
                     st.session_state.captured_items.append(predicted_item)
                     st.success(f"Item added: {predicted_item.capitalize()}")
                     break
@@ -134,7 +139,9 @@ with left_col:
             image = cv2.resize(image, (150, 150))
             image = np.array(image).reshape(1, 150, 150, 3) / 255.0 
             prediction = model.predict(image)
-            predicted_item = categories[prediction.argmax()]
+            p = prediction.argmax().item()
+            predicted_item = loaded_encoder.inverse_transform([p]).item()
+            # predicted_item = categories[prediction.argmax()]
             st.write(f"Predicted Item: {predicted_item}")
             st.session_state.captured_items.append(predicted_item)
             st.success(f"Item added: {predicted_item.capitalize()}")
